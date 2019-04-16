@@ -1,0 +1,192 @@
+#code to be run in PySpark
+from pyspark.sql import Row
+row1 = Row("Barack Obama", "President", "United States")
+row1[0], row1[1]
+row2 = Row(name=“Alex", age=20)
+row2
+row2.name, row2.age
+
+
+#DataFrame creation from RDD
+#toDF function
+rdd1 = sc.parallelize([Row(name='Alice', age=5, height=80),Row(name='Alice', age=5, height=80),Row(name='Alice', age=10, height=80)])
+df = rdd1.toDF()
+df.show()
+
+
+#createDataFrame function
+rdd = sc.parallelize([('Alice', 1)])
+sqlContext.createDataFrame(rdd).collect()
+df = sqlContext.createDataFrame(rdd, ['name', 'age'])
+df.collect()
+
+
+#constructing from data source
+
+df = sqlContext.jsonFile(“file:///home/cloudera/people.json")
+df.show()
+df.printSchema()
+df.select("name").show()
+df.select("name", df.age + 1).show()
+
+
+#SQL RDD Integration
+from pyspark.sql import SQLContext, Row
+sqlContext = SQLContext(sc)
+# Load a text file and convert each line to a Row.
+lines = sc.textFile(“file:///home/cloudera/people.txt")
+parts = lines.map(lambda l: l.split(","))
+people = parts.map(lambda p: Row(name=p[0], age=int(p[1])))
+# Infer the schema, and register the DataFrame as a table.
+schemaPeople = sqlContext.inferSchema(people)
+schemaPeople.registerTempTable("people")
+teenagers = sqlContext.sql("SELECT name FROM people WHERE age >= 13 AND age <= 19")
+teenNames = teenagers.map(lambda p: "Name: " + p.name)
+for teenName in teenNames.collect():
+  print teenName
+
+
+
+#Scala code
+case class Customer(cId: Long, name: String, age: Int, gender: String)
+val customers = List(Customer(1, "James", 21, "M"),
+Customer(2, "Liz", 25, "F"),
+Customer(3, "John", 31, "M"),
+Customer(4, "Jennifer", 45, "F"),
+Customer(5, "Robert", 41, "M"),
+Customer(6, "Sandra", 45, "F"))
+
+val customerDF = sc.parallelize(customers).toDF()
+
+
+
+case class Product(pId: Long, name: String, price: Double, cost: Double)
+val products = List(Product(1, "iPhone", 600, 400),
+Product(2, "Galaxy", 500, 400),
+Product(3, "iPad", 400, 300),
+Product(4, "Kindle", 200, 100),
+Product(5, "MacBook", 1200, 900),
+Product(6, "Dell", 500, 400))
+
+val productDF = sc.parallelize(products).toDF()
+
+case class Home(city: String, size: Int, lotSize: Int,
+bedrooms: Int, bathrooms: Int, price: Int)
+val homes = List(Home("San Francisco", 1500, 4000, 3, 2, 1500000),
+Home("Palo Alto", 1800, 3000, 4, 2, 1800000),
+Home("Mountain View", 2000, 4000, 4, 2, 1500000),
+Home("Sunnyvale", 2400, 5000, 4, 3, 1600000),
+Home("San Jose", 3000, 6000, 4, 3, 1400000),
+Home("Fremont", 3000, 7000, 4, 3, 1500000),
+Home("Pleasanton", 3300, 8000, 4, 3, 1400000),
+Home("Berkeley", 1400, 3000, 3, 3, 1100000),
+Home("Oakland", 2200, 6000, 4, 3, 1100000),
+Home("Emeryville", 2500, 5000, 4, 3, 1200000))
+
+val homeDF = sc.parallelize(homes).toDF
+
+customerDF.cache()
+
+val cols = customerDF.columns
+
+val columnsWithTypes = customerDF.dtypes
+customerDF.printSchema()
+
+customerDF.registerTempTable("customer")
+val countDF = sqlContext.sql("SELECT count(1) AS cnt FROM customer")
+
+val aggregates = productDF.agg(max("price"), min("price"), count("name"))
+
+case class SalesSummary(date: String, product: String, country: String, revenue: Double)
+val sales = List(SalesSummary("01/01/2015", "iPhone", "USA", 40000),
+SalesSummary("01/02/2015", "iPhone", "USA", 30000),
+SalesSummary("01/01/2015", "iPhone", "China", 10000),
+SalesSummary("01/02/2015", "iPhone", "China", 5000),
+SalesSummary("01/01/2015", "S6", "USA", 20000),
+SalesSummary("01/02/2015", "S6", "USA", 10000),
+SalesSummary("01/01/2015", "S6", "China", 9000),
+SalesSummary("01/02/2015", "S6", "China", 6000))
+
+val salesDF = sc.parallelize(sales).toDF()
+
+val salesCubeDF = salesDF.cube($"date", $"product", $"country").sum("revenue")
+salesCubeDF.withColumnRenamed("sum(revenue)", "total").show(30)
+
+salesCubeDF.filter("product IS null AND date IS null AND country='USA'").show
+
+salesCubeDF.filter("date IS null AND product IS NOT null AND country='USA'").show
+
+val countByGender = customerDF.groupBy("gender").count
+countByGender.show
+
+val revenueByProductDF = salesDF.groupBy("product").sum("revenue")
+revenueByProductDF.show
+
+case class Transaction(tId: Long, custId: Long, prodId: Long, date: String, city: String)
+val transactions = List(Transaction(1, 5, 3, "01/01/2015", "San Francisco"),
+Transaction(2, 6, 1, "01/02/2015", "San Jose"),
+Transaction(3, 1, 6, "01/01/2015", "Boston"),
+Transaction(4, 200, 400, "01/02/2015", "Palo Alto"),
+Transaction(6, 100, 100, "01/02/2015", "Mountain View"))
+
+val transactionDF = sc.parallelize(transactions).toDF()
+
+val innerDF = transactionDF.join(customerDF, $"custId" === $"cId", "inner")
+
+innerDF.show
+
+case class SalesByCity(year: Int, city: String, state: String,
+country: String, revenue: Double)
+val salesByCity = List(SalesByCity(2014, "Boston", "MA", "USA", 2000),
+SalesByCity(2015, "Boston", "MA", "USA", 3000),
+SalesByCity(2014, "Cambridge", "MA", "USA", 2000),
+SalesByCity(2015, "Cambridge", "MA", "USA", 3000),
+SalesByCity(2014, "Palo Alto", "CA", "USA", 4000),
+SalesByCity(2015, "Palo Alto", "CA", "USA", 6000),
+SalesByCity(2014, "Pune", "MH", "India", 1000),
+SalesByCity(2015, "Pune", "MH", "India", 1000),
+SalesByCity(2015, "Mumbai", "MH", "India", 1000),
+SalesByCity(2014, "Mumbai", "MH", "India", 2000))
+
+val salesByCityDF = sc.parallelize(salesByCity).toDF()
+
+val rollup = salesByCityDF.rollup($"country", $"state", $"city").sum("revenue")
+
+rollup.show
+
+
+
+#Back to PySpark
+biz = sqlContext.read.json(“file:///home/cloudera/business.json")
+biz.printSchema()
+
+biz.registerTempTable("biz")
+biz.cache()
+
+sqlContext.sql("SELECT count(1) as businesses FROM biz").show()
+
+sqlContext.sql("SELECT state, count(1) as businesses FROM biz GROUP BY state").show(50)
+
+
+sqlContext.sql("SELECT state, count(1) as businesses FROM biz GROUP BY state ORDER BY businesses DESC").show(5)
+
+sqlContext.sql("SELECT name, stars, review_count, city, state FROM biz WHERE stars=5.0").show(5)
+
+sqlContext.sql("SELECT name, stars, review_count, city, state FROM biz WHERE state = 'NV’ AND stars = 5.0").show(3)
+
+
+sqlContext.sql("SELECT state, sum(review_count) as reviews FROM biz GROUP BY state").show()
+
+
+sqlContext.sql("SELECT stars, count(1) as businesses FROM biz GROUP BY stars").show()
+
+
+sqlContext.sql("SELECT state, AVG(review_count) as avg_reviews FROM biz GROUP BY state").show()
+
+sqlContext.sql("SELECT state, ROUND(AVG(review_count)) as avg_reviews FROM biz GROUP BY state ORDER BY avg_reviews DESC LIMIT 5").show()
+
+sqlContext.sql("SELECT name, stars, review_count FROM biz WHERE city = 'Las Vegas' ORDER BY stars DESC, review_count DESC LIMIT 5 ").show()
+
+
+
+

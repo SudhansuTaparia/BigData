@@ -1,0 +1,90 @@
+list = ["a","b","c","d","e","f"]
+rdd = sc.parallelize(list)
+rdd.collect()
+rdd.glom().collect()
+rdd = sc.parallelize(list,3)
+
+
+rdd = sc.textFile('file:///home/cloudera/file.txt')
+rdd.collect()
+
+rdd = sc.textFile('file.txt')
+rdd.collect()
+
+
+//Map transformation
+x = sc.parallelize(["a","b","c"])
+y = x.map(lambda z: (z,z))
+print(x.collect())
+print(y.collect())
+
+
+x = sc.parallelize([4,5,6,8])
+y = x.filter(lambda x:x-5==1)
+print(x.collect())
+print(y.collect())
+
+
+//Flat Map example
+sentencesRDD = sc.parallelize(['Hello world', 'My name is Peeyush'])
+wordsRDD = sentencesRDD.flatMap(lambda sentence: sentence.split(" "))
+print(wordsRDD.collect())
+print(wordsRDD.count())
+
+
+If you have two RDDs, the following methods can be used to combine the two RDDs as described:
+rdd1.union(rdd2): all the items in rdd1 and all the items in rdd2.
+rdd1.intersection(rdd2): all the items in both rdd1 and rdd2
+rdd1.substract(rdd2): all the items in rdd1 but not in rdd2
+rdd1.cartesian(rdd2): all pairs of items (x,y) where x is in rdd1 and y in rdd2 (like an unconditional join in SQL)
+
+
+numbersRDD = sc.parallelize([1,2,3])
+moreNumbersRDD = sc.parallelize([2,3,4])
+
+numbersRDD.union(moreNumbersRDD).collect()
+
+numbersRDD.intersection(moreNumbersRDD).collect()
+
+numbersRDD.subtract(moreNumbersRDD).collect()
+
+numbersRDD.cartesian(moreNumbersRDD).collect()
+
+
+
+x = sc.parallelize(['Ashu','Ashwini','Isha','Mahesh','Manish'])
+y = x.groupBy(lambda w: w[0])
+print [(key, list(value)) for (key,value) in y.collect()]
+
+
+//Reduce
+rdd = sc.parallelize(range(1, 10+1))
+rdd.reduce(lambda x, y: x * y)
+
+
+
+Example of doing word count
+
+
+rdd = sc.parallelize(["Hello hello", "Hello New York", "York says hello"])
+resultRDD = (
+    rdd
+    .flatMap(lambda sentence: sentence.split(" "))  # split into words
+    .map(lambda word: word.lower())                 # lowercase
+    .map(lambda word: (word, 1))                    # count each appearance
+    .reduceByKey(lambda x, y: x + y)                # add counts for each word
+)
+resultRDD.collect()
+
+
+We could collect the result as a map:
+
+result = resultRDD.collectAsMap()
+result
+
+If we just wanted the top 2 words, we could do this:
+
+print(resultRDD
+      .sortBy(keyfunc=lambda (word, count): count, ascending=False)
+      .take(2))
+
