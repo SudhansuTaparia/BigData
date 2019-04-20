@@ -1,4 +1,4 @@
-# Project Title
+# Big Data Technologies
 
 This is a repository i have created to put up some of the knowledge i have gained around Big Data Technologies especially Spark, GraphX etc.
 
